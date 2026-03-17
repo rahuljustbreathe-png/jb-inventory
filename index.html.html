@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JB Inventory — Assembly BoM 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0D1B2A;--teal:#1ABC9C;--teal2:#17A589;--gold:#F39C12;--gold2:#D68910;
+  --red:#E74C3C;--green:#27AE60;--blue:#2980B9;--purple:#8E44AD;
+  --bg:#F0F4F8;--surface:#fff;--border:#DDE3EC;--text:#1A2332;--muted:#7B8FA6;--muted2:#B0BEC5;
+  --sheet-green:#0F9D58;--firebase-orange:#FF6F00;--supabase-teal:#3ECF8E;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* TOPBAR */
+.topbar{background:var(--navy);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(0,0,0,0.25)}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:30px;height:30px;background:var(--teal);border-radius:7px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:16px;height:16px;fill:#fff}
+.logo-text{color:#fff;font-size:14px;font-weight:600}
+.logo-sub{color:#7EC8B8;font-size:10px;letter-spacing:0.8px;text-transform:uppercase}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.save-pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:5px 12px}
+.save-dot{width:7px;height:7px;border-radius:50%;background:var(--teal);transition:background 0.3s}
+.save-dot.saving{background:var(--gold);animation:blink 0.7s infinite}
+.save-dot.synced{background:var(--sheet-green)}
+.save-dot.err{background:var(--red)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.save-text{color:#C5D8EC;font-size:11px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s;white-space:nowrap}
+.btn svg{width:14px;height:14px;flex-shrink:0}
+.btn-teal{background:var(--teal);color:#fff}.btn-teal:hover{background:var(--teal2)}
+.btn-gold{background:var(--gold);color:#fff}.btn-gold:hover{background:var(--gold2)}
+.btn-ghost{background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15)}.btn-ghost:hover{background:rgba(255,255,255,0.14)}
+.btn-sheet{background:var(--sheet-green);color:#fff}.btn-sheet:hover{background:#0B8043}
+.btn-sheet.connected{background:#0B8043}
+.btn-cancel{background:var(--bg);color:var(--muted);border:1px solid var(--border);color:var(--text)}.btn-cancel:hover{background:var(--border)}
+
+/* HERO */
+.hero{background:linear-gradient(140deg,var(--navy) 0%,#1B3A5C 100%);padding:22px 20px 18px;color:#fff}
+.hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.hero h1{font-size:19px;font-weight:600;margin-bottom:3px}
+.hero p{font-size:12px;color:#9DB8D2}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
+@media(max-width:860px){.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:11px 13px}
+.kpi-lbl{font-size:10px;color:#9DB8D2;text-transform:uppercase;letter-spacing:0.7px;margin-bottom:3px}
+.kpi-val{font-size:19px;font-weight:600}
+.kv-ok{color:#1ABC9C}.kv-warn{color:#F39C12}.kv-bad{color:#E74C3C}.kv-blue{color:#5DADE2}
+
+/* SYNC BANNER */
+.sync-banner{padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border);font-size:12px}
+.sync-banner.sheet-banner{background:#E8F5E9;border-bottom-color:#A5D6A7}
+.sync-banner.none-banner{background:#FEF9E7;border-bottom-color:#F9E79F}
+.banner-icon{width:18px;height:18px;flex-shrink:0}
+.banner-text{flex:1}
+.banner-text strong{display:block;font-size:13px}
+.banner-text span{font-size:11px;color:var(--muted)}
+.sync-time{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-left:auto}
+
+/* TOOLBAR */
+.toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:54px;z-index:100}
+.search-wrap{position:relative;flex:1;min-width:180px}
+.search-wrap svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;stroke:var(--muted);fill:none;stroke-width:2}
+.search-input{width:100%;padding:7px 10px 7px 30px;border:1px solid var(--border);border-radius:7px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--bg);color:var(--text);outline:none}
+.search-input:focus{border-color:var(--teal)}
+.sel{padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-family:'DM Sans',sans-serif;font-size:12px;background:var(--bg);color:var(--text);cursor:pointer;outline:none}
+.sel:focus{border-color:var(--teal)}
+.tbar-right{margin-left:auto;display:flex;gap:8px}
+
+/* TABLES */
+.main{padding:16px 20px;max-width:1700px;margin:0 auto}
+.sec-hdr{display:flex;align-items:center;gap:9px;margin:18px 0 8px;cursor:pointer;user-select:none}
+.sec-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.sec-name{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.sec-cnt{font-size:10px;color:var(--muted);background:var(--bg);border:1px solid var(--border);padding:2px 8px;border-radius:20px}
+.chevron{margin-left:auto;color:var(--muted2);font-size:13px;transition:transform 0.2s}
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-bottom:6px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:900px}
+thead th{background:#F7F9FC;padding:8px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--border);white-space:nowrap}
+th.c{text-align:center}th.r{text-align:right}
+tbody tr{border-bottom:1px solid #F0F4F8;transition:background 0.1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#F7FBFF}
+td{padding:7px 10px;vertical-align:middle}
+td.item-name{font-weight:500;min-width:200px;max-width:280px}
+td.item-name small{display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:1px}
+td.c{text-align:center}td.r{text-align:right}
+td.mono{font-family:'DM Mono',monospace;font-size:12px}
+.inp{width:70px;padding:5px 7px;border:1.5px solid var(--border);border-radius:6px;font-family:'DM Mono',monospace;font-size:13px;text-align:center;color:var(--text);background:var(--surface);outline:none;transition:border-color 0.15s}
+.inp.s:focus{border-color:var(--green)}.inp.o:focus{border-color:var(--blue)}
+.date-inp{padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--text);background:var(--surface);outline:none;width:124px}
+.date-inp:focus{border-color:var(--purple)}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+.b-ok{background:#EAFAF1;color:#1E8449}.b-low{background:#FEF9E7;color:#9A7D0A}
+.b-short{background:#FDF2F8;color:#6C3483}.b-out{background:#FDEDEC;color:#922B21}
+.avail{font-weight:600;font-family:'DM Mono',monospace;font-size:13px}
+.a-ok{color:#27AE60}.a-low{color:#F39C12}.a-bad{color:#E74C3C}
+.empty-state{text-align:center;padding:40px;color:var(--muted);font-size:13px}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(13,27,42,0.75);z-index:500;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border-radius:16px;padding:0;width:100%;max-width:560px;box-shadow:0 24px 64px rgba(0,0,0,0.4);overflow:hidden;max-height:90vh;overflow-y:auto}
+.modal-header{padding:22px 24px 16px;border-bottom:1px solid var(--border)}
+.modal-header h2{font-size:16px;font-weight:600;margin-bottom:4px}
+.modal-header p{font-size:12px;color:var(--muted);line-height:1.6}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;background:#FAFBFC}
+
+/* OPTION CARDS */
+.option-card{border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all 0.15s;margin-bottom:12px;position:relative}
+.option-card:hover{border-color:var(--teal);background:#F0FEFB}
+.option-card.selected{border-color:var(--teal);background:#F0FEFB}
+.option-card.selected::after{content:'✓';position:absolute;top:12px;right:14px;background:var(--teal);color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.opt-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.opt-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
+.opt-name{font-size:14px;font-weight:600}
+.opt-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#E8F5E9;color:#1B5E20;margin-left:4px}
+.opt-badge.easy{background:#E3F2FD;color:#0D47A1}
+.opt-desc{font-size:12px;color:var(--muted);line-height:1.6}
+.opt-steps{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)}
+.opt-steps .step{display:flex;gap:8px;font-size:11px;color:var(--muted);margin-bottom:6px;line-height:1.5}
+.opt-steps .step b{color:var(--text)}
+.opt-steps a{color:var(--teal);text-decoration:none}
+.opt-steps a:hover{text-decoration:underline}
+.step-num{background:var(--navy);color:#fff;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+
+.form-field{margin-bottom:14px}
+.form-field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:5px}
+.form-field input,.form-field textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text);outline:none;background:var(--bg)}
+.form-field input:focus,.form-field textarea:focus{border-color:var(--teal);background:#fff}
+.form-field .hint{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5}
+.form-field textarea{resize:vertical;min-height:70px;font-size:12px}
+.tag{font-family:'DM Mono',monospace;font-size:10px;background:#EEF2F7;padding:2px 7px;border-radius:4px;color:#1A2332}
+.divider{height:1px;background:var(--border);margin:16px 0}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--navy);color:#fff;padding:11px 18px;border-radius:10px;font-size:12px;z-index:9999;display:flex;align-items:center;gap:10px;transform:translateY(80px);opacity:0;transition:all 0.25s;max-width:340px;box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.toast.show{transform:translateY(0);opacity:1}
+.t-icon{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.t-ok{background:var(--teal)}.t-err{background:var(--red)}.t-sheet{background:var(--sheet-green)}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zm-9 9H5v-2h6v2zm8 0h-6v-2h6v2zm0-4H5v-2h14v2zM16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2h8zM10 5h4v2h-4V5z"/></svg></div>
+    <div><div class="logo-text">JB Inventory</div><div class="logo-sub">Assembly BoM · 2026</div></div>
+  </div>
+  <div class="topbar-right">
+    <div class="save-pill">
+      <div class="save-dot" id="saveDot"></div>
+      <span class="save-text" id="saveText">Ready</span>
+    </div>
+    <button class="btn btn-sheet" id="cloudBtn" onclick="openCloudModal()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04A7.49 7.49 0 0012 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 000 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>
+      <span id="cloudBtnText">Connect Cloud</span>
+    </button>
+    <button class="btn btn-ghost" onclick="saveNow()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+      Save
+    </button>
+    <button class="btn btn-gold" onclick="exportExcel()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 17l2-3-2-3h1.5l1.25 2 1.25-2H13.5l-2 3 2 3H12l-1.25-2L9.5 17H8z"/></svg>
+      Download Excel
+    </button>
+  </div>
+</div>
+
+<!-- SYNC BANNER -->
+<div class="sync-banner none-banner" id="syncBanner">
+  <svg class="banner-icon" viewBox="0 0 24 24" fill="#F39C12"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+  <div class="banner-text">
+    <strong>No cloud sync yet</strong>
+    <span>Data saved in browser only. Click "Connect Cloud" to sync to Google Sheets, Supabase, or Airtable — all 100% free.</span>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-top">
+    <div>
+      <h1>Assembly BOM — Inventory Tracker</h1>
+      <p>Workers fill In Stock &amp; On Order. Syncs to cloud. You download Excel anytime.</p>
+    </div>
+    <div style="font-size:11px;color:#7EC8B8;font-family:'DM Mono',monospace" id="lastSyncEl">Last sync: —</div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-lbl">Total Items</div><div class="kpi-val" id="kpiTotal">82</div></div>
+    <div class="kpi"><div class="kpi-lbl">OK</div><div class="kpi-val kv-ok" id="kpiOk">—</div></div>
+    <div class="kpi"><div class="kpi-lbl">Low Stock</div><div class="kpi-val kv-warn" id="kpiLow">—</div></div>
+    <div class="kpi"><div class="kpi-lbl">Shortage</div><div class="kpi-val kv-bad" id="kpiShort">—</div></div>
+    <div class="kpi"><div class="kpi-lbl">Out of Stock</div><div class="kpi-val kv-bad" id="kpiOut">—</div></div>
+    <div class="kpi"><div class="kpi-lbl">Stock Value</div><div class="kpi-val kv-blue" id="kpiVal">₹0</div></div>
+  </div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input class="search-input" id="searchInput" type="text" placeholder="Search items…" oninput="renderAll()">
+  </div>
+  <select class="sel" id="filterCat" onchange="renderAll()">
+    <option value="">All Categories</option>
+    <option>ELECTRICAL GOODS</option><option>HARDWARE GOODS</option>
+    <option>MISCELLANEOUS</option><option>PLUMBING GOODS</option>
+    <option>SUBSTRATE</option><option>HORTICULTURE</option><option>FASTENER</option>
+  </select>
+  <select class="sel" id="filterSt" onchange="renderAll()">
+    <option value="">All Status</option>
+    <option value="ok">OK</option><option value="low">Low Stock</option>
+    <option value="short">Shortage</option><option value="out">Out of Stock</option>
+  </select>
+  <div class="tbar-right">
+    <button class="btn" style="background:var(--bg);border:1px solid var(--border);color:var(--muted);font-size:11px" onclick="expandAll()">Expand All</button>
+    <button class="btn" style="background:var(--bg);border:1px solid var(--border);color:var(--muted);font-size:11px" onclick="collapseAll()">Collapse All</button>
+  </div>
+</div>
+
+<div class="main" id="mainContent"></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <div class="t-icon t-ok" id="toastIcon"><svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>
+  <span id="toastMsg">Saved!</span>
+</div>
+
+<!-- CLOUD MODAL -->
+<div class="modal-bg" id="cloudModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>☁️ Connect Free Cloud Storage</h2>
+      <p>Choose a free option. Workers fill inventory in browser → data saves to cloud → you view it anytime.</p>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <!-- Step 1: Choose provider -->
+      <div id="stepChoose">
+
+        <div class="option-card selected" id="card-sheets" onclick="selectProvider('sheets')">
+          <div class="opt-top">
+            <div class="opt-icon" style="background:#E8F5E9">📊</div>
+            <div>
+              <span class="opt-name">Google Sheets</span>
+              <span class="opt-badge easy">Easiest</span>
+              <span class="opt-badge">100% Free</span>
+            </div>
+          </div>
+          <div class="opt-desc">Data saves to a Google Sheet you own. Open it in Excel (File → Download → .xlsx) or view live in browser. Uses a free Google Apps Script webhook.</div>
+          <div class="opt-steps">
+            <div class="step"><div class="step-num">1</div><div>Open <a href="https://sheets.new" target="_blank">sheets.new</a> → create a new sheet → name it <b>JB Inventory</b></div></div>
+            <div class="step"><div class="step-num">2</div><div>In the sheet: <b>Extensions → Apps Script</b> → paste the script below → click Deploy</div></div>
+            <div class="step"><div class="step-num">3</div><div>Copy the Web App URL and paste it here</div></div>
+          </div>
+        </div>
+
+        <div class="option-card" id="card-supabase" onclick="selectProvider('supabase')">
+          <div class="opt-top">
+            <div class="opt-icon" style="background:#E8FBF4">🗄️</div>
+            <div>
+              <span class="opt-name">Supabase</span>
+              <span class="opt-badge">Free Forever</span>
+            </div>
+          </div>
+          <div class="opt-desc">Free PostgreSQL database. 500MB storage, unlimited reads/writes. You get a live dashboard + can export to Excel. No credit card needed.</div>
+          <div class="opt-steps">
+            <div class="step"><div class="step-num">1</div><div>Go to <a href="https://supabase.com" target="_blank">supabase.com</a> → New Project (free) → name it <b>jb-inventory</b></div></div>
+            <div class="step"><div class="step-num">2</div><div>Project Settings → API → copy <b>Project URL</b> and <b>anon public key</b></div></div>
+            <div class="step"><div class="step-num">3</div><div>Paste both below → the table is created automatically</div></div>
+          </div>
+        </div>
+
+        <div class="option-card" id="card-airtable" onclick="selectProvider('airtable')">
+          <div class="opt-top">
+            <div class="opt-icon" style="background:#FCE4EC">📋</div>
+            <div>
+              <span class="opt-name">Airtable</span>
+              <span class="opt-badge">Free Tier</span>
+            </div>
+          </div>
+          <div class="opt-desc">Spreadsheet-database hybrid. Free for up to 1,000 records. Beautiful grid view, can share with team, export to Excel. Like a smarter Excel in the cloud.</div>
+          <div class="opt-steps">
+            <div class="step"><div class="step-num">1</div><div>Go to <a href="https://airtable.com" target="_blank">airtable.com</a> → New base → <b>Start from scratch</b> → name it <b>JB Inventory</b></div></div>
+            <div class="step"><div class="step-num">2</div><div><a href="https://airtable.com/create/tokens" target="_blank">Create a Personal Access Token</a> with <b>data.records:write</b> scope</div></div>
+            <div class="step"><div class="step-num">3</div><div>Paste the Base ID (from URL) and Token below</div></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Step 2: Config for chosen provider -->
+      <div id="stepConfig" style="display:none"></div>
+    </div>
+    <div class="modal-footer" id="modalFooter">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-teal" onclick="goToConfig()">Next: Configure →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// ITEM DATA
+// ══════════════════════════════════════════
+const ITEMS=[
+  {cat:"ELECTRICAL GOODS",name:"3 PIN MAIN PLUG POWER CORD 3 MTR",unit:"Nos",cost:296,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"MAIN WIRES RED 2.5 SQ MM",unit:"Mtr",cost:20,req:2,reorder:5},
+  {cat:"ELECTRICAL GOODS",name:"MAIN WIRES BLACK 2.5 SQ MM",unit:"Mtr",cost:20,req:2,reorder:5},
+  {cat:"ELECTRICAL GOODS",name:"MAIN WIRES GREEN 2.5 SQ MM",unit:"Mtr",cost:20,req:2,reorder:5},
+  {cat:"ELECTRICAL GOODS",name:"MAIN WIRES RED 1 SQ MM",unit:"Mtr",cost:10,req:15,reorder:20},
+  {cat:"ELECTRICAL GOODS",name:"MAIN WIRES BLACK 1 SQ MM",unit:"Mtr",cost:10,req:15,reorder:20},
+  {cat:"ELECTRICAL GOODS",name:"MAIN WIRES GREEN 1 SQ MM",unit:"Mtr",cost:10,req:15,reorder:20},
+  {cat:"ELECTRICAL GOODS",name:"2 PIN MALE FEMALE FOR LOCK",unit:"Nos",cost:30,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"CUZOR MINI UPS PRO 12V ROUTER UPS",unit:"Nos",cost:1864,req:1,reorder:1},
+  {cat:"ELECTRICAL GOODS",name:"RJ45 MALE TO FEMALE LAN CABLE PANEL MOUNT",unit:"Nos",cost:349,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"GROW LIGHT KIT",unit:"Nos",cost:2000,req:1,reorder:1},
+  {cat:"ELECTRICAL GOODS",name:"3Led Strip 12V Waterproof 5730 LED SMD",unit:"Nos",cost:15,req:2,reorder:4},
+  {cat:"ELECTRICAL GOODS",name:"HDMI CABLE HDMI TO MICRO TYPE",unit:"Nos",cost:250,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"UNO Mini Roma 10A Double Pole Mini MCB",unit:"Nos",cost:450,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"Transparent RGB LED 10mm",unit:"Nos",cost:15,req:1,reorder:5},
+  {cat:"ELECTRICAL GOODS",name:"Elmex KUT 2.5 Screw Clamp Terminal Block",unit:"Nos",cost:12,req:10,reorder:20},
+  {cat:"ELECTRICAL GOODS",name:"MOTHER BOARD KIT",unit:"Nos",cost:6000,req:1,reorder:1},
+  {cat:"ELECTRICAL GOODS",name:"DC-DC STEP-DOWN MODULE XL4005",unit:"Nos",cost:250,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"WAVELINK N300 4G WIFI ROUTER",unit:"Nos",cost:1100,req:1,reorder:1},
+  {cat:"ELECTRICAL GOODS",name:"3 PIN 16A Modular Switch Socket",unit:"Nos",cost:230,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"12V SOLENOID LOCK",unit:"Nos",cost:356,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"12V 1.5 AMPS ADAPTOR",unit:"Nos",cost:376,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"ZP4510 Water Float Sensor Switch",unit:"Nos",cost:215,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"EMI-12 3Pin AC Power Socket",unit:"Nos",cost:150,req:1,reorder:2},
+  {cat:"ELECTRICAL GOODS",name:"HEAT SHRINK TUBE SLEEVE 2-6 MM",unit:"Mtr",cost:20,req:5,reorder:10},
+  {cat:"HARDWARE GOODS",name:"CASTOR WHEELS 75x50 NYLON TWIN WHEEL",unit:"Nos",cost:400,req:4,reorder:4},
+  {cat:"HARDWARE GOODS",name:'FOAM TAPE 1"',unit:"Roll",cost:165,req:1,reorder:2},
+  {cat:"HARDWARE GOODS",name:"AXIAL FAN",unit:"Nos",cost:2200,req:5,reorder:5},
+  {cat:"HARDWARE GOODS",name:"CROSS FLOW FAN",unit:"Nos",cost:3800,req:1,reorder:1},
+  {cat:"HARDWARE GOODS",name:"UV LIGHT 55W DOUBLE SIDE + FITTING",unit:"Nos",cost:1800,req:2,reorder:2},
+  {cat:"HARDWARE GOODS",name:"STERILIZER UV SET (TUBE + ADAPTER)",unit:"Nos",cost:430,req:1,reorder:2},
+  {cat:"HARDWARE GOODS",name:'MONITOR 15.4" 39CM',unit:"Nos",cost:3100,req:1,reorder:1},
+  {cat:"HARDWARE GOODS",name:"GLASS 987 x 113MM",unit:"Nos",cost:450,req:1,reorder:2},
+  {cat:"HARDWARE GOODS",name:"INSULATION FOAM 12MM",unit:"Mtr",cost:90,req:4,reorder:5},
+  {cat:"HARDWARE GOODS",name:'C Clamps 2" D UV CHAMBER',unit:"Nos",cost:20,req:2,reorder:5},
+  {cat:"HARDWARE GOODS",name:"DIN MOUNT RAIL 150x35x7.5 MM",unit:"Nos",cost:80,req:1,reorder:2},
+  {cat:"HARDWARE GOODS",name:"DOUBLE DEFLECTION GRILLE 1090x148MM",unit:"Nos",cost:900,req:1,reorder:1},
+  {cat:"MISCELLANEOUS",name:"SR GLUE 200 ml",unit:"Nos",cost:60,req:1,reorder:3},
+  {cat:"MISCELLANEOUS",name:"BEINNATURE LOGO GREEN ACRYLIC 170x40mm",unit:"Nos",cost:80,req:1,reorder:2},
+  {cat:"MISCELLANEOUS",name:"ULTRA PRO LOGO BLUE ACRYLIC Small",unit:"Nos",cost:50,req:1,reorder:2},
+  {cat:"MISCELLANEOUS",name:"ULTRA PRO LOGO BLUE ACRYLIC Large",unit:"Nos",cost:300,req:1,reorder:1},
+  {cat:"MISCELLANEOUS",name:"TOUCH UP BLACK MATT SPRAY",unit:"Nos",cost:150,req:1,reorder:2},
+  {cat:"MISCELLANEOUS",name:"SILICON BLACK",unit:"Nos",cost:220,req:1,reorder:2},
+  {cat:"MISCELLANEOUS",name:"BLACK INSULATION TAPE",unit:"Nos",cost:15,req:1,reorder:5},
+  {cat:"PLUMBING GOODS",name:"ELBOW 16 mm",unit:"Nos",cost:5,req:2,reorder:10},
+  {cat:"PLUMBING GOODS",name:"TEE 16 mm",unit:"Nos",cost:5,req:9,reorder:15},
+  {cat:"PLUMBING GOODS",name:"4MM PLAIN HOSE",unit:"Mtr",cost:8,req:4,reorder:10},
+  {cat:"PLUMBING GOODS",name:"TEFLON TAPE",unit:"Nos",cost:20,req:1,reorder:3},
+  {cat:"PLUMBING GOODS",name:"END TAP VALVE 16 mm",unit:"Nos",cost:8,req:12,reorder:20},
+  {cat:"PLUMBING GOODS",name:'3/4" SS304 PLUG',unit:"Nos",cost:100,req:1,reorder:2},
+  {cat:"PLUMBING GOODS",name:'3/4" SS ELBOW',unit:"Nos",cost:150,req:1,reorder:2},
+  {cat:"PLUMBING GOODS",name:"UV STERILIZER CHAMBER",unit:"Nos",cost:140,req:1,reorder:1},
+  {cat:"PLUMBING GOODS",name:"UV STERILIZER MALE THREAD ELBOW",unit:"Nos",cost:10,req:2,reorder:5},
+  {cat:"PLUMBING GOODS",name:"UV STERILIZER 4MM WHITE RO PIPE",unit:"Mtr",cost:10,req:2,reorder:5},
+  {cat:"PLUMBING GOODS",name:"SUBMERSIBLE PUMP 40 WATTS",unit:"Nos",cost:480,req:2,reorder:2},
+  {cat:"PLUMBING GOODS",name:"STERILIZER PUMP 18 WATTS",unit:"Nos",cost:240,req:1,reorder:1},
+  {cat:"PLUMBING GOODS",name:"6 MM SPRINKLER",unit:"Nos",cost:5,req:72,reorder:100},
+  {cat:"PLUMBING GOODS",name:"16MM GAS PIPE",unit:"Mtr",cost:50,req:3,reorder:5},
+  {cat:"PLUMBING GOODS",name:"TIE CLOSER 150MM",unit:"Nos",cost:40,req:2,reorder:5},
+  {cat:"SUBSTRATE",name:"COCOPEAT 25 KG",unit:"Nos",cost:250,req:2,reorder:2},
+  {cat:"SUBSTRATE",name:"KELPEAT",unit:"Nos",cost:350,req:1,reorder:1},
+  {cat:"SUBSTRATE",name:"BASACOTE PLUS K 6M (250G)",unit:"Nos",cost:397,req:1,reorder:2},
+  {cat:"SUBSTRATE",name:"BLOOM BUDDY 1 KG",unit:"Nos",cost:200,req:1,reorder:2},
+  {cat:"SUBSTRATE",name:"PERLITE 1/2 KG",unit:"Nos",cost:150,req:1,reorder:2},
+  {cat:"SUBSTRATE",name:"VERMICULITE 1 KG",unit:"Nos",cost:150,req:1,reorder:2},
+  {cat:"SUBSTRATE",name:"CLAY PEBBLES",unit:"Nos",cost:1000,req:1,reorder:1},
+  {cat:"HORTICULTURE",name:"OXYCORDYLINE (1,3,5,7)",unit:"Nos",cost:35,req:30,reorder:30},
+  {cat:"HORTICULTURE",name:"GOLDEN MONEY PLANT (8,9)",unit:"Nos",cost:35,req:23,reorder:25},
+  {cat:"HORTICULTURE",name:"GREEN PEPPEROMIA (2,4)",unit:"Nos",cost:35,req:23,reorder:25},
+  {cat:"HORTICULTURE",name:"WHITE QUARTZ PEBBLES 30-40 MM",unit:"KG",cost:15,req:5,reorder:5},
+  {cat:"FASTENER",name:"OPEN SCREW KNOB M6 SS INSERT FEMALE",unit:"Nos",cost:20,req:5,reorder:10},
+  {cat:"FASTENER",name:"SCREW KNOB BLACK M6 x 15mm",unit:"Nos",cost:12,req:10,reorder:20},
+  {cat:"FASTENER",name:"SCREW KNOB BLACK M6 x 25mm",unit:"Nos",cost:12,req:6,reorder:15},
+  {cat:"FASTENER",name:"ALLENKEY BOLTS M6 2 INCH",unit:"Nos",cost:11,req:40,reorder:50},
+  {cat:"FASTENER",name:"SS BOLTS M6 1.0 INCH",unit:"Nos",cost:5,req:20,reorder:30},
+  {cat:"FASTENER",name:"SS BOLT M4 3.0 INCH",unit:"Nos",cost:20,req:25,reorder:30},
+  {cat:"FASTENER",name:"SS BOLT M4 1.0 INCH",unit:"Nos",cost:20,req:25,reorder:30},
+  {cat:"FASTENER",name:"SS BOLT M6 2.0 INCH",unit:"Nos",cost:5,req:8,reorder:15},
+  {cat:"FASTENER",name:"SS NUT M6",unit:"Nos",cost:5,req:8,reorder:15},
+  {cat:"FASTENER",name:"SS WASHER M6",unit:"Nos",cost:5,req:20,reorder:30},
+  {cat:"FASTENER",name:"MS BOLT M8 1.0 INCH",unit:"Nos",cost:4.5,req:18,reorder:25},
+  {cat:"FASTENER",name:"SELF THREAD CSK",unit:"Nos",cost:0.45,req:50,reorder:100},
+];
+
+const CAT_COLOR={"ELECTRICAL GOODS":"#2E86C1","HARDWARE GOODS":"#1E8449","MISCELLANEOUS":"#D4AC0D","PLUMBING GOODS":"#CA6F1E","SUBSTRATE":"#7D3C98","HORTICULTURE":"#117A65","FASTENER":"#616A6B"};
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let inv={}, collapsed={}, cloudCfg=null, autoTimer=null;
+let selectedProvider='sheets';
+
+function loadLocal(){
+  try{ const d=localStorage.getItem('jb-inv-v2'); if(d) inv=JSON.parse(d); }catch(e){inv={};}
+  try{ const c=localStorage.getItem('jb-cloud-v2'); if(c){cloudCfg=JSON.parse(c);updateCloudUI();} }catch(e){}
+}
+
+function persist(){ localStorage.setItem('jb-inv-v2',JSON.stringify(inv)); }
+
+// ══════════════════════════════════════════
+// STATUS / KPI
+// ══════════════════════════════════════════
+function getStatus(i){
+  const item=ITEMS[i],s=inv[i]?.stock||0,o=inv[i]?.order||0,a=s+o;
+  if(s===0) return 'out';
+  if(a<item.req) return 'short';
+  if(a<=item.reorder) return 'low';
+  return 'ok';
+}
+function badge(s){
+  const m={ok:['b-ok','✓ OK'],low:['b-low','▲ Low'],short:['b-short','● Short'],out:['b-out','✕ Out']};
+  return `<span class="badge ${m[s][0]}">${m[s][1]}</span>`;
+}
+function updateKPIs(){
+  let ok=0,low=0,sh=0,out=0,val=0;
+  ITEMS.forEach((_,i)=>{const s=getStatus(i);if(s==='ok')ok++;else if(s==='low')low++;else if(s==='short')sh++;else out++;val+=(inv[i]?.stock||0)*ITEMS[i].cost;});
+  document.getElementById('kpiOk').textContent=ok;
+  document.getElementById('kpiLow').textContent=low;
+  document.getElementById('kpiShort').textContent=sh;
+  document.getElementById('kpiOut').textContent=out;
+  document.getElementById('kpiVal').textContent='₹'+val.toLocaleString('en-IN');
+}
+
+// ══════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════
+function renderAll(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase();
+  const fc=document.getElementById('filterCat').value;
+  const fs=document.getElementById('filterSt').value;
+  const cats=[...new Set(ITEMS.map(i=>i.cat))];
+  let html='',shown=0;
+  cats.forEach(cat=>{
+    if(fc&&fc!==cat) return;
+    const items=ITEMS.map((item,idx)=>({item,idx})).filter(({item,idx})=>{
+      if(item.cat!==cat) return false;
+      if(q&&!item.name.toLowerCase().includes(q)) return false;
+      if(fs&&getStatus(idx)!==fs) return false;
+      return true;
+    });
+    if(!items.length) return;
+    shown+=items.length;
+    const col=CAT_COLOR[cat]||'#888';
+    const cid='s_'+cat.replace(/\s/g,'_');
+    const isColl=collapsed[cid];
+    html+=`<div class="sec-hdr" onclick="toggleSec('${cid}')"><div class="sec-dot" style="background:${col}"></div><span class="sec-name">${cat}</span><span class="sec-cnt">${items.length}</span><span class="chevron" style="transform:${isColl?'rotate(-90deg)':''}">▾</span></div>`;
+    if(!isColl){
+      html+=`<div class="tbl-wrap"><table><thead><tr><th style="width:34px">#</th><th>Item Name</th><th class="c">Unit</th><th class="r">Cost</th><th class="c">Req</th><th class="c" style="color:#1E8449">In Stock ✏</th><th class="c" style="color:#1A5276">On Order ✏</th><th class="c">Available</th><th class="c">Shortage</th><th class="c">Reorder</th><th class="c">Status</th><th class="c" style="color:#6C3483">Last Updated ✏</th></tr></thead><tbody>`;
+      items.forEach(({item,idx})=>{
+        const s=inv[idx]?.stock||0,o=inv[idx]?.order||0,a=s+o,sh=Math.max(item.req-a,0),st=getStatus(idx);
+        const ac=st==='ok'?'a-ok':st==='low'?'a-low':'a-bad';
+        html+=`<tr><td class="c" style="color:var(--muted);font-size:11px">${idx+1}</td><td class="item-name">${item.name}<small>${item.cat}</small></td><td class="c"><span style="background:var(--bg);padding:2px 7px;border-radius:20px;font-size:10px;color:var(--muted)">${item.unit}</span></td><td class="r mono" style="color:var(--muted)">₹${item.cost.toLocaleString('en-IN')}</td><td class="c" style="font-weight:500">${item.req}</td><td class="c"><input class="inp s" type="number" min="0" value="${s}" data-idx="${idx}" data-f="stock" oninput="onInp(this)"></td><td class="c"><input class="inp o" type="number" min="0" value="${o}" data-idx="${idx}" data-f="order" oninput="onInp(this)"></td><td class="c avail ${ac}" id="av${idx}">${a}</td><td class="c" id="sh${idx}" style="color:${sh>0?'var(--red)':'var(--muted)'};font-weight:${sh>0?'600':'400'}">${sh||'—'}</td><td class="c" style="color:var(--muted)">${item.reorder}</td><td class="c" id="st${idx}">${badge(st)}</td><td class="c"><input class="date-inp" type="date" value="${inv[idx]?.date||''}" data-idx="${idx}" data-f="date" oninput="onInp(this)"></td></tr>`;
+      });
+      html+=`</tbody></table></div>`;
+    }
+  });
+  if(!shown) html='<div class="empty-state">No items match your filters.</div>';
+  document.getElementById('mainContent').innerHTML=html;
+}
+
+function onInp(el){
+  const idx=parseInt(el.dataset.idx),f=el.dataset.f;
+  if(!inv[idx]) inv[idx]={stock:0,order:0,date:''};
+  if(f==='stock'||f==='order') inv[idx][f]=parseInt(el.value)||0;
+  else inv[idx][f]=el.value;
+  updateKPIs();
+  const s=inv[idx].stock||0,o=inv[idx].order||0,a=s+o;
+  const item=ITEMS[idx],sh=Math.max(item.req-a,0),st=getStatus(idx);
+  const ac=st==='ok'?'a-ok':st==='low'?'a-low':'a-bad';
+  const av=document.getElementById('av'+idx),shEl=document.getElementById('sh'+idx),stEl=document.getElementById('st'+idx);
+  if(av){av.className='c avail '+ac;av.textContent=a;}
+  if(shEl){shEl.textContent=sh||'—';shEl.style.color=sh>0?'var(--red)':'var(--muted)';shEl.style.fontWeight=sh>0?'600':'400';}
+  if(stEl) stEl.innerHTML=badge(st);
+  scheduleAutoSave();
+}
+
+function scheduleAutoSave(){
+  clearTimeout(autoTimer);
+  setSave('saving','Unsaved changes…');
+  autoTimer=setTimeout(saveNow,3500);
+}
+
+function saveNow(){
+  persist();
+  setSave('ok','Saved locally');
+  if(cloudCfg) syncCloud();
+}
+
+function toggleSec(id){collapsed[id]=!collapsed[id];renderAll();}
+function expandAll(){collapsed={};renderAll();}
+function collapseAll(){[...new Set(ITEMS.map(i=>i.cat))].forEach(c=>{collapsed['s_'+c.replace(/\s/g,'_')]=true;});renderAll();}
+
+function setSave(state,text){
+  document.getElementById('saveDot').className='save-dot'+(state==='saving'?' saving':state==='synced'?' synced':state==='err'?' err':'');
+  document.getElementById('saveText').textContent=text;
+}
+function showToast(msg,type='ok'){
+  const t=document.getElementById('toast'),ic=document.getElementById('toastIcon');
+  document.getElementById('toastMsg').textContent=msg;
+  ic.className='t-icon t-'+type;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+// ══════════════════════════════════════════
+// CLOUD SYNC
+// ══════════════════════════════════════════
+async function syncCloud(){
+  if(!cloudCfg) return;
+  setSave('saving','Syncing to cloud…');
+  try{
+    if(cloudCfg.provider==='sheets') await syncSheets();
+    else if(cloudCfg.provider==='supabase') await syncSupabase();
+    else if(cloudCfg.provider==='airtable') await syncAirtable();
+    const now=new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+    document.getElementById('lastSyncEl').textContent='Last sync: '+now;
+    setSave('synced','Synced ✓');
+    showToast('Synced to '+cloudCfg.provider,'sheet');
+  }catch(e){
+    setSave('err','Sync failed');
+    showToast('Sync failed: '+e.message,'err');
+  }
+}
+
+// Google Sheets via Apps Script webhook
+async function syncSheets(){
+  const rows=ITEMS.map((item,idx)=>[
+    idx+1,item.cat,item.name,item.unit,item.cost,item.req,
+    inv[idx]?.stock||0, inv[idx]?.order||0,
+    (inv[idx]?.stock||0)+(inv[idx]?.order||0),
+    Math.max(item.req-((inv[idx]?.stock||0)+(inv[idx]?.order||0)),0),
+    item.reorder,
+    {ok:'OK',low:'LOW STOCK',short:'SHORTAGE',out:'OUT OF STOCK'}[getStatus(idx)],
+    (inv[idx]?.stock||0)*item.cost,
+    inv[idx]?.date||'',
+    new Date().toISOString()
+  ]);
+  const payload=JSON.stringify({action:'update',rows,headers:['#','Category','Item Name','Unit','Unit Cost','Req Qty','In Stock','On Order','Available','Shortage','Reorder Pt','Status','Stock Value','Last Updated','Synced At']});
+  // Use no-cors mode to bypass CORS — Apps Script accepts this
+  await fetch(cloudCfg.webhookUrl,{
+    method:'POST',
+    mode:'no-cors',
+    headers:{'Content-Type':'text/plain'},
+    body:payload
+  });
+  // no-cors returns opaque response — we can't check status, assume success
+}
+
+// Supabase REST API
+async function syncSupabase(){
+  const rows=ITEMS.map((item,idx)=>({
+    item_id:idx, category:item.cat, item_name:item.name, unit:item.unit,
+    unit_cost:item.cost, req_qty:item.req,
+    in_stock:inv[idx]?.stock||0, on_order:inv[idx]?.order||0,
+    available:(inv[idx]?.stock||0)+(inv[idx]?.order||0),
+    shortage:Math.max(item.req-((inv[idx]?.stock||0)+(inv[idx]?.order||0)),0),
+    reorder_pt:item.reorder,
+    status:{ok:'OK',low:'LOW STOCK',short:'SHORTAGE',out:'OUT OF STOCK'}[getStatus(idx)],
+    stock_value:(inv[idx]?.stock||0)*item.cost,
+    last_updated:inv[idx]?.date||null,
+    synced_at:new Date().toISOString()
+  }));
+  const key=cloudCfg.key;
+  const res=await fetch(`${cloudCfg.url}/rest/v1/jb_inventory`,{
+    method:'POST',
+    headers:{'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+    body:JSON.stringify(rows)
+  });
+  if(!res.ok){
+    const e=await res.json().catch(()=>({}));
+    if(res.status===401||res.status===403){
+      throw new Error('Permission denied — in Supabase go to Table Editor → jb_inventory → click the lock icon → Disable RLS');
+    }
+    throw new Error(e.message||'HTTP '+res.status);
+  }
+}
+
+// Airtable API
+async function syncAirtable(){
+  const chunkSize=10;
+  const allRows=ITEMS.map((item,idx)=>({
+    fields:{
+      'Item ID':idx+1,'Category':item.cat,'Item Name':item.name,'Unit':item.unit,
+      'Unit Cost':item.cost,'Req Qty':item.req,
+      'In Stock':inv[idx]?.stock||0,'On Order':inv[idx]?.order||0,
+      'Available':(inv[idx]?.stock||0)+(inv[idx]?.order||0),
+      'Shortage':Math.max(item.req-((inv[idx]?.stock||0)+(inv[idx]?.order||0)),0),
+      'Reorder Point':item.reorder,
+      'Status':{ok:'OK',low:'LOW STOCK',short:'SHORTAGE',out:'OUT OF STOCK'}[getStatus(idx)],
+      'Stock Value':(inv[idx]?.stock||0)*item.cost,
+      'Last Updated':inv[idx]?.date||''
+    }
+  }));
+  for(let i=0;i<allRows.length;i+=chunkSize){
+    const chunk=allRows.slice(i,i+chunkSize);
+    const res=await fetch(`https://api.airtable.com/v0/${cloudCfg.baseId}/Inventory`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+cloudCfg.token,'Content-Type':'application/json'},
+      body:JSON.stringify({records:chunk})
+    });
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Airtable error');}
+  }
+}
+
+// ══════════════════════════════════════════
+// CLOUD MODAL
+// ══════════════════════════════════════════
+function openCloudModal(){
+  document.getElementById('cloudModal').classList.add('open');
+  document.getElementById('stepChoose').style.display='block';
+  document.getElementById('stepConfig').style.display='none';
+  document.getElementById('modalFooter').innerHTML=`<button class="btn btn-cancel" onclick="closeModal()">Cancel</button><button class="btn btn-teal" onclick="goToConfig()">Next: Configure →</button>`;
+  // Auto-select Supabase since project already created
+  selectProvider('supabase');
+}
+function closeModal(){document.getElementById('cloudModal').classList.remove('open');}
+
+function selectProvider(p){
+  selectedProvider=p;
+  ['sheets','supabase','airtable'].forEach(id=>{
+    document.getElementById('card-'+id).classList.toggle('selected',id===p);
+  });
+}
+
+function goToConfig(){
+  document.getElementById('stepChoose').style.display='none';
+  const cfg=document.getElementById('stepConfig');
+  cfg.style.display='block';
+
+  if(selectedProvider==='sheets'){
+    cfg.innerHTML=`
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:4px">📊 Google Sheets Setup</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">You need to deploy a free Google Apps Script as a web hook. Takes about 3 minutes.</p>
+      <div style="background:#F8FFF9;border:1px solid #A5D6A7;border-radius:8px;padding:14px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:600;color:#1B5E20;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Apps Script Code — copy this entire script</div>
+        <textarea readonly style="width:100%;height:120px;font-family:'DM Mono',monospace;font-size:10px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text);resize:none">function doPost(e){
+  var ss=SpreadsheetApp.getActiveSpreadsheet();
+  var sh=ss.getSheetByName('Inventory')||ss.insertSheet('Inventory');
+  var raw=e.postData.contents;
+  var data=JSON.parse(raw);
+  sh.clearContents();
+  sh.appendRow(data.headers);
+  data.rows.forEach(function(r){sh.appendRow(r);});
+  sh.getRange(1,1,1,data.headers.length).setBackground('#0D1B2A').setFontColor('#FFFFFF').setFontWeight('bold');
+  return ContentService.createTextOutput(JSON.stringify({status:'ok'})).setMimeType(ContentService.MimeType.JSON);
+}
+function doGet(e){return ContentService.createTextOutput('JB Inventory Webhook Active');}</textarea>
+        <button class="btn btn-teal" style="margin-top:8px;font-size:11px" onclick="copyScript()">Copy Script</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+        <b>Steps:</b> Open <a href="https://sheets.new" target="_blank" style="color:var(--teal)">sheets.new</a> → Extensions → Apps Script → paste above → Save → Deploy → New Deployment → Web App → Execute as: <b>Me</b> → Who has access: <b>Anyone</b> → Deploy → Copy URL
+      </div>
+      <div class="form-field">
+        <label>Apps Script Web App URL</label>
+        <input type="url" id="sheetsUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec" value="${cloudCfg?.webhookUrl||''}">
+        <div class="hint">Paste the deployment URL here. Starts with https://script.google.com/macros/</div>
+      </div>`;
+    document.getElementById('modalFooter').innerHTML=`<button class="btn btn-cancel" onclick="backToChoose()">← Back</button><button class="btn btn-sheet" onclick="saveConfig('sheets')">Connect Google Sheets ✓</button>`;
+  }
+
+  else if(selectedProvider==='supabase'){
+    cfg.innerHTML=`
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:4px">🗄️ Supabase — Almost Done!</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px">Your project is already created. Just 2 quick steps remaining.</p>
+
+      <div style="background:#E8FBF4;border:1px solid #6FCFB0;border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#0D4F3C;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">✅ Project URL — already filled in</div>
+        <div style="font-family:'DM Mono',monospace;font-size:12px;color:#0F9D58;background:#fff;padding:8px 12px;border-radius:6px;border:1px solid #A5D6A7">https://nyyyymtlwfbcqlbbrraxo.supabase.co</div>
+      </div>
+
+      <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#5D4037;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Step 1 — Run this SQL (one time only)</div>
+        <div style="font-size:11px;color:#5D4037;margin-bottom:8px;line-height:1.6">In Supabase → <b>SQL Editor</b> → New query → paste below → Run</div>
+        <textarea readonly id="sqlCode" style="width:100%;height:90px;font-family:'DM Mono',monospace;font-size:10px;background:#fff;border:1px solid #FFD54F;border-radius:6px;padding:8px;color:#333;resize:none;line-height:1.6">CREATE TABLE IF NOT EXISTS jb_inventory (
+  item_id int PRIMARY KEY,
+  category text, item_name text, unit text,
+  unit_cost numeric, req_qty int,
+  in_stock int DEFAULT 0, on_order int DEFAULT 0,
+  available int, shortage int, reorder_pt int,
+  status text, stock_value numeric,
+  last_updated text, synced_at text
+);</textarea>
+        <button class="btn btn-teal" style="margin-top:8px;font-size:11px" onclick="navigator.clipboard.writeText(document.getElementById('sqlCode').value).then(()=>showToast('SQL copied!'))">Copy SQL</button>
+        <a href="https://supabase.com/dashboard/project/nyyyymtlwfbcqlbbrraxo/sql/new" target="_blank" class="btn" style="margin-top:8px;margin-left:6px;font-size:11px;background:#3ECF8E;color:#fff">Open SQL Editor ↗</a>
+      </div>
+
+      <div style="background:#E8F4FD;border:1px solid #90CAF9;border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#0D3C61;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Step 2 — Paste your Anon Key</div>
+        <div style="font-size:11px;color:#0D3C61;margin-bottom:10px;line-height:1.6">
+          Go to <a href="https://supabase.com/dashboard/project/nyyyymtlwfbcqlbbrraxo/settings/api" target="_blank" style="color:#0078D4;font-weight:600">Project Settings → API ↗</a> → scroll to <b>Project API Keys</b> → copy the <b>anon public</b> key
+        </div>
+        <div class="form-field" style="margin-bottom:0">
+          <input type="text" id="supaKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." value="${cloudCfg?.key||''}" style="font-family:'DM Mono',monospace;font-size:11px">
+          <div class="hint" style="margin-top:6px">Starts with <span style="font-family:'DM Mono',monospace">eyJ...</span> — safe to use, it's a public read/write key for your own project</div>
+        </div>
+      </div>
+
+      <input type="hidden" id="supaUrl" value="https://nyyyymtlwfbcqlbbrraxo.supabase.co">`;
+    document.getElementById('modalFooter').innerHTML=`<button class="btn btn-cancel" onclick="backToChoose()">← Back</button><button class="btn btn-teal" onclick="saveConfig('supabase')">Connect Supabase ✓</button>`;
+  }
+
+  else if(selectedProvider==='airtable'){
+    cfg.innerHTML=`
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:4px">📋 Airtable Setup</h3>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Free for up to 1,000 records. Export to Excel anytime with one click.</p>
+      <div style="background:#FFF8F8;border:1px solid #FFCDD2;border-radius:8px;padding:14px;margin-bottom:16px;font-size:11px;color:#4A1010;line-height:1.8">
+        1. Go to <a href="https://airtable.com" target="_blank" style="color:#E74C3C">airtable.com</a> → New base → Start from scratch → name it <b>JB Inventory 2026</b><br>
+        2. Rename the first table to <b>Inventory</b> (click the tab)<br>
+        3. Go to <a href="https://airtable.com/create/tokens" target="_blank" style="color:#E74C3C">airtable.com/create/tokens</a> → Create token → Scope: <b>data.records:write</b> → Add base → Copy token<br>
+        4. Copy the Base ID from the URL: airtable.com/<b>appXXXXXXXX</b>/...
+      </div>
+      <div class="form-field">
+        <label>Base ID</label>
+        <input type="text" id="atBase" placeholder="appXXXXXXXXXXXXXX" value="${cloudCfg?.baseId||''}">
+        <div class="hint">From URL: airtable.com/appXXXXXX/...</div>
+      </div>
+      <div class="form-field">
+        <label>Personal Access Token</label>
+        <input type="text" id="atToken" placeholder="patXXXXXXXXXXXXXX.xxxx..." value="${cloudCfg?.token||''}">
+      </div>`;
+    document.getElementById('modalFooter').innerHTML=`<button class="btn btn-cancel" onclick="backToChoose()">← Back</button><button class="btn btn-teal" onclick="saveConfig('airtable')">Connect Airtable ✓</button>`;
+  }
+}
+
+function backToChoose(){
+  document.getElementById('stepChoose').style.display='block';
+  document.getElementById('stepConfig').style.display='none';
+  document.getElementById('modalFooter').innerHTML=`<button class="btn btn-cancel" onclick="closeModal()">Cancel</button><button class="btn btn-teal" onclick="goToConfig()">Next: Configure →</button>`;
+}
+
+function copyScript(){
+  const txt=document.querySelector('#stepConfig textarea').value;
+  navigator.clipboard.writeText(txt).then(()=>showToast('Script copied!','ok'));
+}
+
+function saveConfig(provider){
+  if(provider==='sheets'){
+    const url=document.getElementById('sheetsUrl').value.trim();
+    if(!url||!url.includes('script.google.com')){alert('Please enter a valid Apps Script URL.');return;}
+    cloudCfg={provider:'sheets',webhookUrl:url};
+  } else if(provider==='supabase'){
+    const url=document.getElementById('supaUrl').value.trim();
+    const key=document.getElementById('supaKey').value.trim();
+    if(!url||!key){alert('Please enter both URL and API key.');return;}
+    cloudCfg={provider:'supabase',url,key};
+  } else if(provider==='airtable'){
+    const baseId=document.getElementById('atBase').value.trim();
+    const token=document.getElementById('atToken').value.trim();
+    if(!baseId||!token){alert('Please enter Base ID and Token.');return;}
+    cloudCfg={provider:'airtable',baseId,token};
+  }
+  localStorage.setItem('jb-cloud-v2',JSON.stringify(cloudCfg));
+  updateCloudUI();
+  closeModal();
+  showToast('Cloud connected! Syncing now…','sheet');
+  syncCloud();
+}
+
+function updateCloudUI(){
+  if(!cloudCfg) return;
+  const names={sheets:'Google Sheets',supabase:'Supabase · Mumbai 🇮🇳',airtable:'Airtable'};
+  const icons={sheets:'📊',supabase:'🗄️',airtable:'📋'};
+  const btn=document.getElementById('cloudBtn');
+  btn.className='btn btn-sheet connected';
+  document.getElementById('cloudBtnText').textContent=icons[cloudCfg.provider]+' '+names[cloudCfg.provider];
+  const banner=document.getElementById('syncBanner');
+  banner.className='sync-banner sheet-banner';
+  const extraLink = cloudCfg.provider==='supabase'
+    ? `<a href="https://supabase.com/dashboard/project/nyyyymtlwfbcqlbbrraxo/editor" target="_blank" class="btn" style="font-size:11px;background:#3ECF8E;color:#fff;padding:4px 12px;border-radius:6px;text-decoration:none">View Table ↗</a>`
+    : '';
+  banner.innerHTML=`<svg class="banner-icon" viewBox="0 0 24 24" fill="#27AE60"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+  <div class="banner-text"><strong>Syncing to ${names[cloudCfg.provider]}</strong><span>Every save pushes all 82 items to your database. Download Excel from the table view.</span></div>
+  ${extraLink}
+  <button class="btn btn-cancel" style="font-size:11px;padding:4px 10px" onclick="disconnectCloud()">Disconnect</button>`;
+}
+
+function disconnectCloud(){
+  cloudCfg=null;
+  localStorage.removeItem('jb-cloud-v2');
+  const banner=document.getElementById('syncBanner');
+  banner.className='sync-banner none-banner';
+  banner.innerHTML=`<svg class="banner-icon" viewBox="0 0 24 24" fill="#F39C12"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg><div class="banner-text"><strong>No cloud sync</strong><span>Click "Connect Cloud" to sync to Google Sheets, Supabase, or Airtable — all free.</span></div>`;
+  document.getElementById('cloudBtn').className='btn btn-sheet';
+  document.getElementById('cloudBtnText').textContent='Connect Cloud';
+  showToast('Cloud disconnected','err');
+}
+
+// ══════════════════════════════════════════
+// EXCEL EXPORT
+// ══════════════════════════════════════════
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  const rows=[['#','Category','Item Name','Unit','Unit Cost (₹)','Req Qty','In Stock','On Order','Available','Shortage','Reorder Pt','Status','Stock Value (₹)','Last Updated']];
+  ITEMS.forEach((item,idx)=>{
+    const s=inv[idx]?.stock||0,o=inv[idx]?.order||0,a=s+o,sh=Math.max(item.req-a,0);
+    rows.push([idx+1,item.cat,item.name,item.unit,item.cost,item.req,s,o,a,sh,item.reorder,{ok:'OK',low:'LOW STOCK',short:'SHORTAGE',out:'OUT OF STOCK'}[getStatus(idx)],s*item.cost,inv[idx]?.date||'']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{w:4},{w:18},{w:40},{w:7},{w:13},{w:8},{w:10},{w:10},{w:10},{w:10},{w:12},{w:14},{w:15},{w:14}];
+  XLSX.utils.book_append_sheet(wb,ws,'Inventory');
+  XLSX.writeFile(wb,'JB_Inventory_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('Excel downloaded!','ok');
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+loadLocal();
+updateKPIs();
+renderAll();
+setSave('ok','Ready');
+setInterval(()=>{if(cloudCfg) syncCloud();},5*60*1000);
+</script>
+</body>
+</html>
